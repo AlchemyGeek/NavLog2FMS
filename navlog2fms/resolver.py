@@ -1,8 +1,12 @@
 import math
 import os
+import re
 from dataclasses import dataclass
 
 from navlog2fms.models import CommonRoute, ResolvedPoint, ResolvedRoute
+
+# Airway designator pattern: V23, J146, Q13, T215, etc.
+_AIRWAY_RE = re.compile(r'^[VJQTABGLMNPRW]\d+$')
 
 # Nav database file locations relative to X-Plane install root
 _FIX_DAT_REL = "Resources/default data/earth_fix.dat"
@@ -215,10 +219,19 @@ def resolve(common: CommonRoute, xplane_path: str) -> ResolvedRoute:
     dest = _resolve_ident(common.destination, ref_lat, ref_lon, len(common.points) + 1, altitude_ft=0)
 
     if unresolved:
-        raise ValueError(
-            f"Could not resolve {len(unresolved)} waypoint(s): {', '.join(unresolved)}. "
-            "Check idents against your X-Plane nav database."
-        )
+        airways = [i for i in unresolved if _AIRWAY_RE.match(i)]
+        plain   = [i for i in unresolved if not _AIRWAY_RE.match(i)]
+        parts = []
+        if airways:
+            parts.append(
+                f"Airways are not supported (found: {', '.join(airways)}). "
+                "Use the individual waypoints that make up the route instead of airway designators."
+            )
+        if plain:
+            parts.append(
+                f"Could not find in nav database: {', '.join(plain)}."
+            )
+        raise ValueError(" | ".join(parts))
 
     return ResolvedRoute(
         departure=dep,
