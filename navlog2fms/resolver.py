@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from navlog2fms.models import CommonRoute, ResolvedPoint, ResolvedRoute
 
 # Airway designator pattern: V23, J146, Q13, T215, etc.
-_AIRWAY_RE = re.compile(r'^[VJQTABGLMNPRW]\d+$')
+# Parsers should pre-expand airways — this is a safety net for unexpected input.
+_AIRWAY_RE = re.compile(r'^[VJQT]\d+')
 
 # Nav database file locations relative to X-Plane install root
 _FIX_DAT_REL = "Resources/default data/earth_fix.dat"
@@ -223,14 +224,13 @@ def resolve(common: CommonRoute, xplane_path: str) -> ResolvedRoute:
         plain   = [i for i in unresolved if not _AIRWAY_RE.match(i)]
         parts = []
         if airways:
+            # Should not happen — parsers pre-expand airways before reaching here
             parts.append(
-                f"Airways are not supported (found: {', '.join(airways)}). "
-                "Use the individual waypoints that make up the route instead of airway designators."
+                f"Airway designator(s) reached the resolver unexpectedly: "
+                f"{', '.join(airways)}. This is a parser bug."
             )
         if plain:
-            parts.append(
-                f"Could not find in nav database: {', '.join(plain)}."
-            )
+            parts.append(f"Could not find in nav database: {', '.join(plain)}.")
         raise ValueError(" | ".join(parts))
 
     return ResolvedRoute(

@@ -7,6 +7,7 @@ class RoutePoint:
     point_type_hint: str | None  # "fix" | "vor" | "ndb" | "airport" | None
     altitude_ft: int | None
     sequence: int
+    via: str = "DIRECT"          # airway name if reached via an airway, else "DIRECT"
 
 
 @dataclass

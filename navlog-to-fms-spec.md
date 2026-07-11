@@ -48,11 +48,50 @@ ready to load in the G1000 CO ROUTE list.
   — the resolver needs a disambiguation strategy (see below).
 
 ## Out of scope for v1
-- SID/STAR/airway expansion. If a source navlog contains a named procedure
-  instead of individual fixes, the parser should flag it as unresolved rather
-  than guess.
 - Any in-cockpit automation (auto-selecting/activating the loaded route in the
   G1000 UI). The user does that final step manually.
+- SID/STAR procedure expansion (distinct from airways — a named departure or
+  arrival procedure that isn't a fix-to-fix airway). Not yet tested against a
+  real navlog; if a source navlog contains one, the parser should flag it as
+  unresolved rather than guess, until we have a real example to design against.
+
+## Airway support (confirmed — no new resolver needed)
+Tested against a real IFR Garmin Pilot navlog (KLSE BOOTY DLL RANDO **V341**.OSH
+KOSH) and confirmed by the user for SkyVector as well:
+
+**Both source formats pre-expand airway segments into individual named fixes
+before the PDF/export is generated.** The terse route-summary line shows the
+compressed form (`RANDO V341.OSH`), but the detailed waypoint listing already
+contains the real intermediate fixes the airway resolves to (`DOYAG`, `BADAN`),
+each with its own altitude — Garmin's/SkyVector's own routing engine did the
+`earth_awy.dat`-equivalent expansion for us.
+
+**Consequence: no airway-graph resolver is needed.** Every point in a route,
+whether airway-derived or direct, is just a plain ident that goes through the
+existing nav-database resolver unchanged. This significantly simplifies what
+was originally scoped as an "out of scope for v1" risk area.
+
+**What actually changes:**
+1. **Garmin Pilot parser**: switch from treating the terse `ROUTE` line as the
+   primary source of waypoint sequence to treating the **waypoint table** as
+   authoritative (it's already parsed for altitude, so this is a re-prioritization,
+   not new work). The terse line becomes diagnostic-only — useful for logging
+   which airway was used, never for driving parsing logic, since it silently
+   drops airway-expanded fixes if relied upon directly.
+2. **SkyVector parser**: needs verification that its `Planned Route` line (the
+   only route-listing source it has, unlike Garmin's separate terse+table split)
+   also shows the fully expanded fix list rather than a compressed form. User
+   has confirmed SkyVector does expand airways in general; exact text of the
+   `Planned Route` line for an airway route hasn't been directly inspected yet.
+   Low risk given the confirmation, but worth a quick sanity check against a
+   real sample before considering this fully closed out.
+3. **Optional/cosmetic**: add a `via: str = "DIRECT"` field to `RoutePoint`,
+   populated from the terse route line when it names an airway (e.g. `"V341"`),
+   purely for audit/logging ("BADAN reached via V341") — no resolution or
+   writer logic depends on this field.
+
+No `earth_awy.dat` parsing, airway segment graph, or segment-walking logic is
+needed for either format based on current evidence.
 
 ## Architecture
 
